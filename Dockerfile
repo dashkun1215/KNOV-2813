@@ -1,4 +1,5 @@
-FROM openjdk:8
-COPY ./src/ /tmp
-WORKDIR /tmp
-ENTRYPOINT ["java","App"]
+FROM openjdk:11
+COPY . /usr/KNOV-2813
+WORKDIR /usr/KNOV-2813/app
+RUN javac App.java
+CMD ["java","App"]
