@@ -12,10 +12,11 @@ phases:
     commands:
       - echo Build phase started
       - git clone https://github.com/dashkun1215/KNOV-2813.git
-      - pip3 install --upgrade --user awscli
-#       - curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
-#       - unzip awscli-bundle.zip
-#       - sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+#       - pip3 install --upgrade --user awscli
+      - sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      - sudo unzip awscliv2.zip
+      - sudo ./aws/install
+      - aws --version
       - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 672671632666.dkr.ecr.eu-west-1.amazonaws.com
       - cd ./KNOV-2813
       - docker build -t knov-2813 .
