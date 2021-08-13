@@ -13,7 +13,7 @@ phases:
       - echo Build phase started
       - git clone https://github.com/dashkun1215/KNOV-2813.git
       - cd ./KNOV-2813
-      - apt-get install awscli
+      - sudo apt-get install awscli
       - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 672671632666.dkr.ecr.eu-west-1.amazonaws.com
       - docker build -t knov-2813 .
       - docker tag knov-2813:latest 672671632666.dkr.ecr.eu-west-1.amazonaws.com/knov-2813:latest
