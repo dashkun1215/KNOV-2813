@@ -13,6 +13,9 @@ phases:
       - echo Build phase started
       - git clone https://github.com/dashkun1215/KNOV-2813.git
 #       - pip3 install --upgrade --user awscli
+      - sudo apt-get install software-properties-common
+      - sudo apt-add-repository universe
+      - sudo apt-get update
       - sudo apt-get install python-pip
       - npm install
       - pip install --upgrade awscli
