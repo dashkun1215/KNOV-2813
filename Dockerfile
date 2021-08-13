@@ -1,5 +1,4 @@
-FROM openjdk:11
-COPY . /usr/KNOV-2813
-WORKDIR /usr/KNOV-2813/app
-RUN javac App.java
-CMD ["java","App"]
+FROM tomcat:8.0
+MAINTAINER Dasha
+RUN rm -rf /usr/local/tomcat/webapps/ROOT
+COPY ./ROOT.war /usr/local/tomcat/webapps/
