@@ -5,17 +5,13 @@ phases:
     commands:
       - echo Install phase started
       - apt-get update -y
-      - apt-get install git -y
-      - apt-get install docker -y
       - su
       - apt-get install sudo
 
   build:
     commands:
       - echo Build phase started
-      - sudo service docker stop
-      - sudo service docker start
-      - git clone https://github.com/dashkun1215/KNOV-2813.git
+#       - git clone https://github.com/dashkun1215/KNOV-2813.git
       - pwd
       - cd ./KNOV-2813
       - sudo docker build -t knov-2813 .
