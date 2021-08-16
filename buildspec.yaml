@@ -18,4 +18,4 @@ phases:
       
 artifacts:
   files:
-    - "672671632666.dkr.ecr.eu-west-1.amazonaws.com/knov-2813:latest"
+    - "sha256:b8851b3accdbac546ae156d7f965a3cb074c972bbd2ed62788f34c43f2e3f4a7"
