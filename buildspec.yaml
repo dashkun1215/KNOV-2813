@@ -11,7 +11,7 @@ phases:
   build:
     commands:
       - echo Build phase started
-      - docker login -u AWS --password-stdin $(aws ecr get-login-password --region eu-west-1) 672671632666.dkr.ecr.eu-west-1.amazonaws.com
+#       - docker login -u AWS --password-stdin $(aws ecr get-login-password --region eu-west-1) 672671632666.dkr.ecr.eu-west-1.amazonaws.com
 #       - aws ecr get-login-password --region eu-west-1 672671632666.dkr.ecr.eu-west-1.amazonaws.com
 #       | docker login --username AWS --password-stdin 
       - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 672671632666.dkr.ecr.eu-west-1.amazonaws.com
