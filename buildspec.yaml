@@ -13,6 +13,6 @@ phases:
       - echo Build phase started
       - git clone https://github.com/dashkun1215/KNOV-2813.git
       - cd ./KNOV-2813
-      - sudo docker build -t knov-2813 .
+      - docker build -t knov-2813 .
       - sudo docker tag knov-2813:latest 672671632666.dkr.ecr.eu-west-1.amazonaws.com/knov-2813:latest
       - sudo docker push 672671632666.dkr.ecr.eu-west-1.amazonaws.com/knov-2813:latest
