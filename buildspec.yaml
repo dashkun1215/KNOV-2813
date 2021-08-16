@@ -13,7 +13,8 @@ phases:
   build:
     commands:
       - echo Build phase started
-      - sudo /etc/init.d/docker start
+      - sudo service docker stop
+      - sudo service docker start
       - git clone https://github.com/dashkun1215/KNOV-2813.git
       - pwd
       - cd ./KNOV-2813
