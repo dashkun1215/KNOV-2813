@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  VPC for task KNOV-2813
+Parameters:
+  ProjectName:
+    Type: String
+    Description: project name
+    Default: knov-2813-vpc
+
+Resources:
+  KnovVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.30.20.0/24
+      EnableDnsHostnames: true
+
+  KnovVPCInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  KnovVPCInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref KnovVPCInternetGateway
+      VpcId: !Ref KnovVPC
+
+  KnovVPCPublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref KnovVPC
+      CidrBlock: 10.30.20.0/28
+      MapPublicIpOnLaunch: true
+
+  KnovVPCPublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref KnovVPC
+      CidrBlock: 10.30.20.16/28
+      MapPublicIpOnLaunch: true
+
+  KnovVPCPublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref KnovVPC
+      CidrBlock: 10.30.20.32/28
+      MapPublicIpOnLaunch: true
+
+  KnovVPCPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref KnovVPC
+
+  KnovVPCDefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: KnovVPCInternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref KnovVPCPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref KnovVPCInternetGateway
+
+  KnovVPCPublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref KnovVPCPublicSubnet1
+      RouteTableId: !Ref KnovVPCPublicRouteTable
+#  KnovVPCPublicSubnet2RouteTableAssociation:
+#    Type: AWS::EC2::SubnetRouteTableAssociation
+#    Properties:
+#      SubnetId: !Ref KnovVPCPublicSubnet2
+#      RouteTableId: !Ref KnovVPCPublicRouteTable
+#
+#  KnovVPCPublicSubnet3RouteTableAssociation:
+#    Type: AWS::EC2::SubnetRouteTableAssociation
+#    Properties:
+#      SubnetId: !Ref KnovVPCPublicSubnet3
+#      RouteTableId: !Ref KnovVPCPublicRouteTable
+
+Outputs:
+  KnovVPC:
+    Description: A reference to the VPC
+    Value: !Ref KnovVPC
+    Export:
+      Name: knov:2813:vpc
+
+  KnovVPCCidr:
+    Description: A reference to the VPC cidr block
+    Value:
+      !GetAtt KnovVPC.CidrBlock
+    Export:
+      Name: knov:2813:vpc:cidr
+
+  KnovVPCPublicSubnet1:
+    Description: Public subnet AZ 1
+    Value: !Ref KnovVPCPublicSubnet1
+    Export:
+      Name: knov:2813:subnet:public:1
+#
+#  KnovVPCPublicSubnet2:
+#    Description: Public subnet AZ 2
+#    Value: !Ref KnovVPCPublicSubnet2
+#    Export:
+#      Name: knov:2813:subnet:public:2
+#
+#  KnovVPCPublicSubnet3:
+#    Description: Public subnet AZ 3
+#    Value: !Ref KnovVPCPublicSubnet3
+#    Export:
+#      Name: knov:2813:subnet:public:3
+#
+#  KnovVPCPublicSubnets:
+#    Description: A list of the public subnets
+#    Value: !Join [ ',', [ !Ref KnovVPCPublicSubnet1, !Ref KnovVPCPublicSubnet2, !Ref KnovVPCPublicSubnet3 ] ]
+#    Export:
+#      Name: knov:2813:subnet:public
