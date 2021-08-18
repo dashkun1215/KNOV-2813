@@ -1,6 +1,6 @@
 [
   {
-    "name": "knov-2813-container",
-    "imageUri": "672671632666.dkr.ecr.eu-west-1.amazonaws.com/knov-2813:latest"
+    "name": "672671632666-knov-2813cfn-eu-west-1",
+    "imageUri": "672671632666.dkr.ecr.eu-west-1.amazonaws.com/knov-2813-cfn:latest"
   }
 ]
