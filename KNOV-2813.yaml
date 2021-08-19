@@ -6,8 +6,6 @@ Parameters:
     Type: String
     Description: knovio-infrastructure project name
     Default: knov-2813-cfn
-  GitHubTocken:
-    Type: String
 
 Resources:
   # ECR repositories
@@ -69,6 +67,7 @@ Resources:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/standard:5.0
+        ImagePullCredentialsType: CODEBUILD
         PrivilegedMode: true
       Source:
         Type: CODEPIPELINE
@@ -79,32 +78,28 @@ Resources:
           GroupName: !Ref LogGroup
           Status: ENABLED
 
-#  CodeDeployProject:
-#    Type: AWS::CodeBuild::Project
-#    Properties:
-#      Name: !Sub Daryna-${ProjectName}-${AccountType}-templates-deploy-project-${AWS::Region}
-#      Description: !Sub "${ProjectName} templates deploy CodeBuild project for CodePipeline (${AccountType}/${AWS::Region})"
-#      BadgeEnabled: false
-#      QueuedTimeoutInMinutes: 10
-#      TimeoutInMinutes: 45
-#      Artifacts:
-#        Type: CODEPIPELINE
-#      Environment:
-#        Type: LINUX_CONTAINER
-#        ComputeType: BUILD_GENERAL1_SMALL
-#        Image: aws/codebuild/standard:3.0
-#        EnvironmentVariables:
-#          - Name: AccountType
-#            Type: PLAINTEXT
-#            Value: !Ref AccountType
-#      Source:
-#        Type: CODEPIPELINE
-#        BuildSpec: buildspec.yaml
-#      ServiceRole: !Ref ManagmentRole
-#      LogsConfig:
-#        CloudWatchLogs:
-#          GroupName: !Ref
-#          Status: ENABLED
+  CodeDeployProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub Daryna-${ProjectName}-templates-deploy-project-${AWS::Region}
+      Description: !Sub "${ProjectName} templates deploy CodeBuild project for CodePipeline"
+      BadgeEnabled: false
+      QueuedTimeoutInMinutes: 10
+      TimeoutInMinutes: 45
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:3.0
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yaml
+      ServiceRole: !Ref ServiceRole
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref LogGroup
+          Status: ENABLED
 
   ClusterECS:
     Type: AWS::ECS::Cluster
@@ -112,25 +107,6 @@ Resources:
       CapacityProviders:
         - FARGATE
       ClusterName: knov-2813-cfn
-
-  ServiceECS:
-    Type: AWS::ECS::Service
-    Properties:
-      Cluster: !Ref ClusterECS
-      DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 100
-      DeploymentController:
-        Type: ECS
-      LaunchType: FARGATE
-      NetworkConfiguration:
-         AwsvpcConfiguration:
-           AssignPublicIp: ENABLED
-           Subnets:
-             - !ImportValue knov:2813:subnet:public:1
-#      Role: String
-      ServiceName: 2813-cfn
-      TaskDefinition: !Ref TaskDefinition
 
   # CloudWatch Log Group
   LogGroup:
@@ -144,12 +120,12 @@ Resources:
   #Roles
   ServiceRole:
     Type: AWS::IAM::Role
-    DeletionPolicy: Delete
     Properties:
       ManagedPolicyArns:
         - !Ref ECRPolicy
         - !Ref CodeBuildBasePolicy
         - !Ref CodeBuildCloudWatchLogsPolicy
+        - !Ref ECSPolicy
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -160,10 +136,9 @@ Resources:
           - Effect: Allow
             Principal:
               Service:
-              - codepipeline.amazonaws.com
-              - codebuild.amazonaws.com
+                - codepipeline.amazonaws.com
+                - codebuild.amazonaws.com
             Action: sts:AssumeRole
-
 
   PipelineRole:
     Type: AWS::IAM::Role
@@ -171,6 +146,8 @@ Resources:
     Properties:
       ManagedPolicyArns:
         - !Ref AWSCodePipelineServiceRolePolicy
+        - !Ref CloudWatchLogsPolicy
+        - !Ref ECSPolicy
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -209,67 +186,51 @@ Resources:
             Resource:
               - !GetAtt EcrRepository.Arn
 
-
-  CodeBuildBasePolicy:
+  ECSPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: 2813-CodeBuild-policy
-      Description: !Sub "${ProjectName} CodeBuild"
+      ManagedPolicyName: 2813-ECS-policy
+      Description: !Sub "${ProjectName} ECS creation"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
-            Resource:
-              - !GetAtt LogGroup.Arn
-              - !Join
-                - ''
-                - - !GetAtt LogGroup.Arn
-                  - ':*'
             Action:
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-          - Effect: Allow
+              - ecs:*
+#              - ecs:UpdateService
+#              - ecs:UpdateCluster
+#              - ecs:CreateService
+#              - ecs:RunTask
+#              - ecs:StartTask
+#              - ecs:DeleteService
+#              - ecs:DeleteCluster
+#              - ecs:StopTask
+#              - ecs:DeleteTaskSet
+#              - ecs:UpdateTaskSet
+#              - ecs:CreateCluster
+#              - ecs:CreateTaskSet
             Resource:
-              - !GetAtt CodePipelineBucket.Arn
-              - !Join
-                - ''
-                - - !GetAtt CodePipelineBucket.Arn
-                  - ':*'
-            Action:
-              - s3:PutObject
-              - s3:GetObject
-              - s3:GetObjectVersion
-              - s3:GetBucketAcl
-              - s3:GetBucketLocation
-          - Effect: Allow
-            Action:
-              - codebuild:CreateReportGroup
-              - codebuild:CreateReport
-              - codebuild:UpdateReport
-              - codebuild:BatchPutTestCases
-              - codebuild:BatchPutCodeCoverages
-            Resource:
-              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/Daryna-*"
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/*
 
-  CodeBuildCloudWatchLogsPolicy:
+  CloudWatchLogsPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: 2813-CodeBuildCloudWatchLogs-policy
+      ManagedPolicyName: 2813-CloudWatchLogs-policy
       Description: !Sub "${ProjectName} CloudWatch"
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Resource:
-              - !Join
-                - ''
-                - - !GetAtt LogGroup.Arn
-                  - ':*'
+              - arn:aws:logs:eu-west-1:672671632666:log-group:knov-2813-cfn:*
             Action:
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
+          - Effect: Allow
+            Action: "*"
+            Resource: "*"
+          #            all
 
   AWSCodePipelineServiceRolePolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -309,12 +270,21 @@ Resources:
               - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
             Effect: Allow
           - Action:
-              - codebuild:BatchGetBuilds
-              - codebuild:StartBuild
-              - codebuild:BatchGetBuildBatches
-              - codebuild:StartBuildBatch
+            - codebuild:BatchGetBuilds
+            - codebuild:StartBuild
+            - codebuild:BatchGetBuildBatches
+            - codebuild:StartBuildBatch
+            - codepipeline:*
+            - codedeploy:CreateDeployment
+            - codedeploy:GetApplication
+            - codedeploy:GetApplicationRevision
+            - codedeploy:GetDeployment
+            - codedeploy:GetDeploymentConfig
+            - codedeploy:RegisterApplicationRevision
+            - codestar-connections:UseConnection
             Resource:
-              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/Daryna*"
+              - "*"
+#              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:*/Daryna*"
             Effect: Allow
           - Effect: Allow
             Action:
@@ -324,8 +294,86 @@ Resources:
           - Effect: Allow
             Action:
               - ecr:DescribeImages
-            Resource: !GetAtt EcrRepository.Arn
+            Resource: '*'
         Version: '2012-10-17'
+
+
+  CodeBuildBasePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: 2813-CodeBuild-policy
+      Description: !Sub "${ProjectName} CodeBuild"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Resource:
+              - !GetAtt LogGroup.Arn
+              - !Join
+                - ''
+                - - !GetAtt LogGroup.Arn
+                  - ':*'
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+          - Effect: Allow
+            Resource:
+              - !GetAtt CodePipelineBucket.Arn
+              - !Join
+                - ''
+                - - !GetAtt CodePipelineBucket.Arn
+                  - ':*'
+            Action:
+              - s3:Put*
+              - s3:Get*
+              - s3:ListBucket
+          - Effect: Allow
+            Action: "*"
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - codebuild:CreateReportGroup
+              - codebuild:CreateReport
+              - codebuild:UpdateReport
+              - codebuild:BatchPutTestCases
+              - codebuild:BatchPutCodeCoverages
+              - codebuild:BatchGetBuilds
+              - codebuild:StartBuild
+              - codebuild:BatchGetBuildBatches
+              - codebuild:StartBuildBatch
+              - codepipeline:*
+              - codebuild:*
+              - codedeploy:CreateDeployment
+              - codedeploy:GetApplication
+              - codedeploy:GetApplicationRevision
+              - codedeploy:GetDeployment
+              - codedeploy:GetDeploymentConfig
+              - codedeploy:RegisterApplicationRevision
+              - codestar-connections:UseConnection
+            Resource:
+              - "*"
+#              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/Daryna-*"
+
+  CodeBuildCloudWatchLogsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: 2813-CodeBuildCloudWatchLogs-policy
+      Description: !Sub "${ProjectName} CloudWatch"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Resource:
+              - !GetAtt LogGroup.Arn
+              - !Join
+                - ''
+                - - !GetAtt LogGroup.Arn
+                  - ':*'
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
 
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -339,13 +387,14 @@ Resources:
         - FARGATE
       ContainerDefinitions:
         - Name: !Sub ${AWS::AccountId}-knov-2813cfn-${AWS::Region}
-          Image: 672671632666.dkr.ecr.eu-west-1.amazonaws.com/knov-2813:latest
+          Image: amazon/amazon-ecs-sample
           LogConfiguration:
             LogDriver: awslogs
             Options:
               awslogs-group: !Ref LogGroup
               awslogs-region: eu-west-1
               awslogs-stream-prefix: ecs
+
 
   TaskECS:
     Type: AWS::ECS::TaskSet
@@ -360,62 +409,53 @@ Resources:
       Service: !Ref ServiceECS
       TaskDefinition: !Ref TaskDefinition
 
-  # Pipeline
-  CodePipeline:
-    Type: AWS::CodePipeline::Pipeline
+  ServiceECS:
+    Type: AWS::ECS::Service
     Properties:
-      Name: knov-2813-cfn
-      RoleArn: !GetAtt PipelineRole.Arn
-      ArtifactStore:
-        Type: S3
-        Location: !Ref CodePipelineBucket
-#      RestartExecutionOnUpdate: true
-      Stages:
-        - Name: Source
-          Actions:
-            - Name: Source
-              InputArtifacts: [ ]
-              Namespace: "SourceVariables"
-              ActionTypeId:
-                Category: Source
-                Owner: ThirdParty
-                Version: "1"
-                Provider: GitHub
-              OutputArtifacts:
-                - Name: SourceArtifact
-              Configuration:
-                Owner: "dashkun1215"
-                Branch: main
-                Repo: KNOV-2813
-                OAuthToken: !Ref "GitHubTocken"
-                PollForSourceChanges: false
-              RunOrder: 1
-        - Name: Build
-          Actions:
-            - Name: Validation
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: "1"
-              InputArtifacts:
-                - Name: SourceArtifact
-              OutputArtifacts:
-                - Name: BuildArtifact
-              Configuration:
-                ProjectName: !Ref CodeBuildProject
-              RunOrder: 1
-        - Name: Deploy
-          Actions:
-            - Name: Deploy
-              ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: ECS
-                Version: "1"
-              InputArtifacts:
-#                - Name: imagedefinitions.json
-                - Name: BuildArtifact
-              Configuration:
-                ClusterName: knov-2813-cfn
-                ServiceName: !Ref ServiceECS
+      Cluster: !Ref ClusterECS
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      LaunchType: FARGATE
+      NetworkConfiguration:
+         AwsvpcConfiguration:
+           AssignPublicIp: ENABLED
+           Subnets:
+             - !ImportValue knov:2813:subnet:public:1
+      ServiceName: 2813-cfn
+      TaskDefinition: !Ref TaskDefinition
+
+Outputs:
+  ServiceECS:
+    Description: A reference to the ServiceECS
+    Value: !Ref ServiceECS
+    Export:
+      Name: knov:2813:ServiceECS
+
+
+  CodePipelineBucket:
+    Description: A reference to the CodePipelineBucket
+    Value: !Ref CodePipelineBucket
+    Export:
+      Name: knov:2813:CodePipelineBucket
+
+  CodeBuildProject:
+    Description: A reference to the CodeBuildProject
+    Value: !Ref CodeBuildProject
+    Export:
+      Name: knov:2813:CodeBuildProject
+
+  ClusterECS:
+    Description: A reference to the ClusterECS
+    Value: !Ref ClusterECS
+    Export:
+      Name: knov:2813:ClusterECS
+
+  PipelineRole:
+    Description: A reference to the PipelineRole
+    Value: !GetAtt PipelineRole.Arn
+    Export:
+      Name: knov:2813:PipelineRole
+

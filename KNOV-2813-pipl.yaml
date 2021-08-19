@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  pipeline and task for KNOV-2813
+Parameters:
+  ProjectName:
+    Type: String
+    Description: knovio-infrastructure project name
+    Default: knov-2813-pipe
+  GitHubTocken:
+    Type: String
+
+
+Resources:
+
+  # Pipeline
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: knov-2813-cfn
+      RoleArn: !ImportValue knov:2813:PipelineRole
+      ArtifactStore:
+        Type: S3
+        Location: !ImportValue knov:2813:CodePipelineBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              InputArtifacts: [ ]
+              Namespace: "SourceVariables"
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: "1"
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                Owner: "dashkun1215"
+                Branch: master
+                Repo: KNOV-2813
+                OAuthToken: !Ref "GitHubTocken"
+                PollForSourceChanges: false
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: Validation
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: "1"
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !ImportValue knov:2813:CodeBuildProject
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ECS
+                Version: "1"
+              InputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ClusterName: !ImportValue knov:2813:ClusterECS
+                ServiceName: !ImportValue knov:2813:ServiceECS
