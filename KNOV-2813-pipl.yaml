@@ -2,6 +2,15 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: >
   pipeline and task for KNOV-2813
 Parameters:
+  AccountType:
+    Description: The type of the account.
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - stage
+      - prod
   ProjectName:
     Type: String
     Description: knovio-infrastructure project name
@@ -16,7 +25,7 @@ Resources:
   CodePipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      Name: knov-2813-cfn
+      Name: !Sub ${AccountType}-knov-2813-cfn
       RoleArn: !ImportValue knov:2813:PipelineRole
       ArtifactStore:
         Type: S3

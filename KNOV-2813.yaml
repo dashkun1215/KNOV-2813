@@ -2,6 +2,15 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: >
   training task KNOV-2813
 Parameters:
+  AccountType:
+    Description: The type of the account.
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - qa
+      - stage
+      - prod
   ProjectName:
     Type: String
     Description: knovio-infrastructure project name
@@ -14,7 +23,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      RepositoryName: knov-2813-cfn
+      RepositoryName: !Sub ${AccountType}-knov-2813-cfn
 
   #CodePipelineBucket
   CodePipelineBucket:
@@ -22,7 +31,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub ${ProjectName}-${AWS::Region}-${AWS::AccountId}
+      BucketName: !Sub ${AccountType}-${ProjectName}-${AWS::Region}-${AWS::AccountId}
       AccessControl: Private
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
@@ -56,7 +65,7 @@ Resources:
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Sub Daryna-${ProjectName}-knov-2813-project-${AWS::Region}
+      Name: !Sub Daryna-${AccountType}-${ProjectName}-knov-2813-project-${AWS::Region}
       Description: "Project for KNOV-2813"
       BadgeEnabled: false
       QueuedTimeoutInMinutes: 10
@@ -81,7 +90,7 @@ Resources:
   CodeDeployProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Sub Daryna-${ProjectName}-templates-deploy-project-${AWS::Region}
+      Name: !Sub Daryna-${AccountType}-${ProjectName}-templates-deploy-project-${AWS::Region}
       Description: !Sub "${ProjectName} templates deploy CodeBuild project for CodePipeline"
       BadgeEnabled: false
       QueuedTimeoutInMinutes: 10
@@ -106,7 +115,7 @@ Resources:
     Properties:
       CapacityProviders:
         - FARGATE
-      ClusterName: knov-2813-cfn
+      ClusterName: !Sub ${AccountType}-knov-2813-cfn
 
   # CloudWatch Log Group
   LogGroup:
@@ -115,7 +124,7 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       RetentionInDays: 7
-      LogGroupName: knov-2813-cfn
+      LogGroupName: !Sub ${AccountType}-knov-2813-cfn
 
   #Roles
   ServiceRole:
@@ -124,8 +133,9 @@ Resources:
       ManagedPolicyArns:
         - !Ref ECRPolicy
         - !Ref CodeBuildBasePolicy
-        - !Ref CodeBuildCloudWatchLogsPolicy
+        - !Ref CloudWatchLogsPolicy
         - !Ref ECSPolicy
+        - !Ref IAMPolicy
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -140,6 +150,7 @@ Resources:
                 - codebuild.amazonaws.com
             Action: sts:AssumeRole
 
+
   PipelineRole:
     Type: AWS::IAM::Role
     DeletionPolicy: Delete
@@ -148,6 +159,8 @@ Resources:
         - !Ref AWSCodePipelineServiceRolePolicy
         - !Ref CloudWatchLogsPolicy
         - !Ref ECSPolicy
+        - !Ref CodeBuildBasePolicy
+        - !Ref IAMPolicy
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -185,6 +198,10 @@ Resources:
             Effect: Allow
             Resource:
               - !GetAtt EcrRepository.Arn
+          - Action:
+              - ecr:GetAuthorizationToken
+            Effect: Allow
+            Resource: '*'
 
   ECSPolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -196,21 +213,41 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - ecs:*
-#              - ecs:UpdateService
-#              - ecs:UpdateCluster
-#              - ecs:CreateService
-#              - ecs:RunTask
-#              - ecs:StartTask
-#              - ecs:DeleteService
-#              - ecs:DeleteCluster
-#              - ecs:StopTask
-#              - ecs:DeleteTaskSet
-#              - ecs:UpdateTaskSet
-#              - ecs:CreateCluster
-#              - ecs:CreateTaskSet
+              - ecs:Update*
+              - ecs:Create*
+              - ecs:RunTask
+              - ecs:Start*
+              - ecs:StopTask
+              - ecs:Delete*
             Resource:
-              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*/*
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/${AccountType}*
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/${AccountType}*
+              - !GetAtt ClusterECS.Arn
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-set/${AccountType}*
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:container-instance/${AccountType}*
+          - Action:
+              - ecs:CreateTaskSet
+              - ecs:Register*
+              - ecs:Deregister*
+              - ecs:Describe*
+              - ecs:List*
+            Effect: Allow
+            Resource:
+              - "*"
+
+  IAMPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: 2813-IAM-policy
+      Description: !Sub "${ProjectName} ECS creation"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - iam:PassRole
+            Effect: Allow
+            Resource:
+              - "*"
 
   CloudWatchLogsPolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -222,15 +259,11 @@ Resources:
         Statement:
           - Effect: Allow
             Resource:
-              - arn:aws:logs:eu-west-1:672671632666:log-group:knov-2813-cfn:*
+              - !GetAtt LogGroup.Arn
             Action:
               - logs:CreateLogGroup
               - logs:CreateLogStream
               - logs:PutLogEvents
-          - Effect: Allow
-            Action: "*"
-            Resource: "*"
-          #            all
 
   AWSCodePipelineServiceRolePolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -246,14 +279,7 @@ Resources:
               - codedeploy:GetDeployment
               - codedeploy:GetDeploymentConfig
               - codedeploy:RegisterApplicationRevision
-            Resource: !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project*"
-            Effect: Allow
-          - Action:
-              - cloudwatch:*
-              - s3:*
-              - cloudformation:*
-              - ecs:*
-            Resource: "*"
+            Resource: !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:*/Daryna*"
             Effect: Allow
           - Action:
               - cloudformation:CreateStack
@@ -283,18 +309,13 @@ Resources:
             - codedeploy:RegisterApplicationRevision
             - codestar-connections:UseConnection
             Resource:
-              - "*"
-#              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:*/Daryna*"
+              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:*/Daryna*"
             Effect: Allow
           - Effect: Allow
             Action:
               - cloudformation:ValidateTemplate
             Resource:
               - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*
-          - Effect: Allow
-            Action:
-              - ecr:DescribeImages
-            Resource: '*'
         Version: '2012-10-17'
 
 
@@ -308,31 +329,19 @@ Resources:
         Statement:
           - Effect: Allow
             Resource:
-              - !GetAtt LogGroup.Arn
-              - !Join
-                - ''
-                - - !GetAtt LogGroup.Arn
-                  - ':*'
-            Action:
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-          - Effect: Allow
-            Resource:
               - !GetAtt CodePipelineBucket.Arn
-              - !Join
-                - ''
-                - - !GetAtt CodePipelineBucket.Arn
-                  - ':*'
+              - !Sub
+                - ${CodePipelineBucketArn}/*
+                - CodePipelineBucketArn: !GetAtt CodePipelineBucket.Arn
             Action:
               - s3:Put*
+              - s3:CreateBucket
               - s3:Get*
+              - s3:DeleteBucket
               - s3:ListBucket
           - Effect: Allow
-            Action: "*"
-            Resource: "*"
-          - Effect: Allow
             Action:
+              - codebuild:*
               - codebuild:CreateReportGroup
               - codebuild:CreateReport
               - codebuild:UpdateReport
@@ -343,37 +352,12 @@ Resources:
               - codebuild:BatchGetBuildBatches
               - codebuild:StartBuildBatch
               - codepipeline:*
-              - codebuild:*
               - codedeploy:CreateDeployment
-              - codedeploy:GetApplication
-              - codedeploy:GetApplicationRevision
-              - codedeploy:GetDeployment
-              - codedeploy:GetDeploymentConfig
+              - codedeploy:Get*
               - codedeploy:RegisterApplicationRevision
               - codestar-connections:UseConnection
             Resource:
-              - "*"
-#              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/Daryna-*"
-
-  CodeBuildCloudWatchLogsPolicy:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      ManagedPolicyName: 2813-CodeBuildCloudWatchLogs-policy
-      Description: !Sub "${ProjectName} CloudWatch"
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Resource:
-              - !GetAtt LogGroup.Arn
-              - !Join
-                - ''
-                - - !GetAtt LogGroup.Arn
-                  - ':*'
-            Action:
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
+              - !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/Daryna-*"
 
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -386,8 +370,8 @@ Resources:
       RequiresCompatibilities:
         - FARGATE
       ContainerDefinitions:
-        - Name: !Sub ${AWS::AccountId}-knov-2813cfn-${AWS::Region}
-          Image: amazon/amazon-ecs-sample
+        - Name: !Sub ${AccountType}-${AWS::AccountId}-knov-2813cfn-${AWS::Region}
+          Image: alpine:3.4
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -395,19 +379,6 @@ Resources:
               awslogs-region: eu-west-1
               awslogs-stream-prefix: ecs
 
-
-  TaskECS:
-    Type: AWS::ECS::TaskSet
-    Properties:
-      Cluster: !Ref ClusterECS
-      LaunchType: FARGATE
-      NetworkConfiguration:
-        AwsVpcConfiguration:
-          AssignPublicIp: ENABLED
-          Subnets:
-            - !ImportValue knov:2813:subnet:public:1
-      Service: !Ref ServiceECS
-      TaskDefinition: !Ref TaskDefinition
 
   ServiceECS:
     Type: AWS::ECS::Service
@@ -424,7 +395,9 @@ Resources:
            AssignPublicIp: ENABLED
            Subnets:
              - !ImportValue knov:2813:subnet:public:1
-      ServiceName: 2813-cfn
+             - !ImportValue knov:2813:subnet:public:2
+             - !ImportValue knov:2813:subnet:public:3
+      ServiceName: !Sub ${AccountType}-2813-cfn
       TaskDefinition: !Ref TaskDefinition
 
 Outputs:
