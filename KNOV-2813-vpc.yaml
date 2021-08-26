@@ -17,6 +17,25 @@ Parameters:
     Default: knov-2813-vpc
 
 Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for KNOV-2813
+      GroupName: Knov-2813-SG
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: All
+          FromPort: 0
+          ToPort: 65535
+          Description: Allows All Traffic
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          Description: Allows All TCP
+      VpcId: !Ref KnovVPC
+
   KnovVPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -118,3 +137,8 @@ Outputs:
     Export:
       Name: knov:2813:subnet:public:3
 
+  SecurityGroup:
+    Description: A reference to the SecurityGroup
+    Value: !Ref SecurityGroup
+    Export:
+      Name: knov:2813:SecurityGroup

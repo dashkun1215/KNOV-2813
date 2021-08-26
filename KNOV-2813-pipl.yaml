@@ -20,6 +20,53 @@ Parameters:
 
 
 Resources:
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub Daryna-${AccountType}-${ProjectName}-knov-2813-project-${AWS::Region}
+      Description: "Project for KNOV-2813"
+      BadgeEnabled: false
+      QueuedTimeoutInMinutes: 10
+      TimeoutInMinutes: 15
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yaml
+      ServiceRole: !ImportValue knov:2813:ServiceRole
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !ImportValue knov:2813:LogGroup
+          Status: ENABLED
+
+  CodeDeployProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub Daryna-${AccountType}-${ProjectName}-templates-deploy-project-${AWS::Region}
+      Description: !Sub "${ProjectName} templates deploy CodeBuild project for CodePipeline"
+      BadgeEnabled: false
+      QueuedTimeoutInMinutes: 10
+      TimeoutInMinutes: 45
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:3.0
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yaml
+      ServiceRole: !ImportValue knov:2813:ServiceRole
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !ImportValue knov:2813:LogGroup
+          Status: ENABLED
 
   # Pipeline
   CodePipeline:
@@ -63,7 +110,7 @@ Resources:
               OutputArtifacts:
                 - Name: BuildArtifact
               Configuration:
-                ProjectName: !ImportValue knov:2813:CodeBuildProject
+                ProjectName: !Ref CodeBuildProject
               RunOrder: 1
         - Name: Deploy
           Actions:
