@@ -4,17 +4,9 @@ phases:
   install:
     commands:
       - echo Install phase started
-      - apt-get update -y
-      - su
-      - apt-get install sudo
+
 
   build:
     commands:
-      - echo Build phase started
-      - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 672671632666.dkr.ecr.eu-west-1.amazonaws.com
-      - sudo docker build -t dev-knov-2813-cfn .
-      - sudo docker tag dev-knov-2813-cfn:latest 672671632666.dkr.ecr.eu-west-1.amazonaws.com/dev-knov-2813-cfn:latest
-      - sudo docker push 672671632666.dkr.ecr.eu-west-1.amazonaws.com/dev-knov-2813-cfn:latest
-  
-artifacts:
-  files: imagedefinitions.json
+      - echo Build phase finished
+
